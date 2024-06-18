@@ -130,28 +130,41 @@ describe("solquad", async () => {
   });
 
   // Test 3
-  it("tries to add the project in the different pool", async() => {
+  it("tries to add the project in a different pool", async () => {
+    // Fetch the project account to check its current pool association
+    let projectAccount = await program.account.project.fetch(projectPDA1);
+  
+    // Check if the project is already associated with a pool
+    if (projectAccount.isInPool) {
+      throw new Error("Project is already associated with a pool");
+    }
+  
+    // Initialize the different pool and escrow
     const poolIx = await program2.methods.initializePool().accounts({
       poolAccount: differentPoolPDA,
     }).instruction();
-
+  
     const escrowIx = await program2.methods.initializeEscrow(new BN(10000)).accounts({
       escrowAccount: differentEscrowPDA,
-    })
-    .instruction()
-
+    }).instruction();
+  
+    // Add the project to the different pool
     const addProjectTx = await program2.methods.addProjectToPool().accounts({
       projectAccount: projectPDA1,
       poolAccount: differentPoolPDA,
-      escrowAccount: differentEscrowPDA
-    })
-    .preInstructions([escrowIx, poolIx])
-    .rpc();
-
-    console.log("Different pool is created and the project is inserted into it", addProjectTx);
-
-    const data = await program.account.pool.fetch(differentPoolPDA)
-    console.log("data projects", data.projects);
+      escrowAccount: differentEscrowPDA,
+    }).preInstructions([escrowIx, poolIx]).rpc();
+  
+    // Update the project's isInPool flag to true after adding to the pool
+    await program.methods.setIsInPool(true).accounts({
+      projectAccount: projectPDA1,
+    }).rpc();
+  
+    console.log("Project added to a different pool successfully", addProjectTx);
+  
+    // Fetch and log the updated data from the different pool
+    const data = await program.account.pool.fetch(differentPoolPDA);
+    console.log("Data projects in different pool", data.projects);
   });
 
   // Test 4
