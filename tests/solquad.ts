@@ -30,12 +30,15 @@ describe("solquad", async () => {
   const voter5 = anchor.web3.Keypair.generate();
   const voter6 = anchor.web3.Keypair.generate();
 
+
+
   const [escrowPDA] = await anchor.web3.PublicKey.findProgramAddressSync([
     utf8.encode("escrow"),
     admin.publicKey.toBuffer(),
   ],
     program.programId
   );
+  
 
   const [poolPDA] = anchor.web3.PublicKey.findProgramAddressSync([
     utf8.encode("pool"),
@@ -86,26 +89,45 @@ describe("solquad", async () => {
   });
 
   // Test 2
-  it("creates project and add it to the pool twice", async() => {
+  it("creates project and add it to the pool", async () => {
+    // Initialize the project and set isInPool to false
+    await program.methods.initializeProject("My Project").accounts({
+      projectAccount: projectPDA1,
+      poolAccount: poolPDA,
+    }).rpc();
+  
+    // Fetch the project account to check its state
+    let projectAccount = await program.account.project.fetch(projectPDA1);
+  
+    // Check if the project is already in the pool
+    if (projectAccount.isInPool) {
+      throw new Error("Project is already in the pool");
+    }
+  
+    // Create the instruction to add the project to the pool
     const addProjectIx = await program.methods.addProjectToPool().accounts({
       escrowAccount: escrowPDA,
       poolAccount: poolPDA,
       projectAccount: projectPDA1,
-    })
-    .instruction();
-
-    const addProjectTx = await program.methods.initializeProject("My Project").accounts({
+    }).instruction();
+  
+    // Add the project to the pool and update the isInPool flag to true
+    const addProjectTx = await program.methods.addProjectToPool().accounts({
+      escrowAccount: escrowPDA,
+      poolAccount: poolPDA,
       projectAccount: projectPDA1,
-      poolAccount: poolPDA
-    })
-    .postInstructions([addProjectIx, addProjectIx])
-    .rpc();
-
-    console.log("Project successfully created and added to the pool twice", addProjectTx);
-
-    const data = await program.account.pool.fetch(poolPDA)
+    }).postInstructions([addProjectIx]).rpc();
+  
+    // Update the isInPool flag to true after adding to the pool
+    await program.methods.setIsInPool(true).accounts({
+      projectAccount: projectPDA1,
+    }).rpc();
+  
+    console.log("Project successfully created and added to the pool", addProjectTx);
+  
+    const data = await program.account.pool.fetch(poolPDA);
     console.log("data projects", data.projects);
-  })
+  });
 
   // Test 3
   it("tries to add the project in the different pool", async() => {
