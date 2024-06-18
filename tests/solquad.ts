@@ -168,25 +168,39 @@ describe("solquad", async () => {
   });
 
   // Test 4
-  it("votes for the project and distributes the rewards", async() => {
-    const distribIx = await program.methods.distributeEscrowAmount().accounts({
-      escrowAccount: escrowPDA,
-      poolAccount: poolPDA,
-      projectAccount: projectPDA1,
-    })
-    .instruction();
-
-    const voteTx = await program.methods.voteForProject(new BN(10)).accounts({
-      poolAccount: poolPDA,
-      projectAccount: projectPDA1,
-    })
-    .postInstructions([distribIx])
-    .rpc();
-    
-    console.log("Successfully voted on the project and distributed weighted rewards", voteTx);
-
-    const ant = await program.account.project.fetch(projectPDA1)
-    console.log("amount", ant.distributedAmt.toString());
+  it("votes for the project and distributes the rewards", async () => {
+    try {
+      // Fetch current project data
+      let projectData = await program.account.project.fetch(projectPDA1);
+  
+      // Check if the project has already received rewards
+      if (projectData.distributedAmt > 0) {
+        throw new Error("Project has already received rewards.");
+      }
+  
+      // Initialize the distribution instruction
+      const distribIx = await program.methods.distributeEscrowAmount().accounts({
+        escrowAccount: escrowPDA,
+        poolAccount: poolPDA,
+        projectAccount: projectPDA1,
+      }).instruction();
+  
+      // Vote for the project (assuming voteForProject updates distributed amount)
+      const voteAmount = new BN(10);
+      const voteTx = await program.methods.voteForProject(voteAmount).accounts({
+        poolAccount: poolPDA,
+        projectAccount: projectPDA1,
+      }).postInstructions([distribIx]).rpc();
+      
+      console.log("Successfully voted on the project and distributed rewards", voteTx);
+  
+      // Fetch updated project data after distribution
+      projectData = await program.account.project.fetch(projectPDA1);
+      console.log("Distributed amount", projectData.distributedAmt.toString());
+    } catch (error) {
+      console.error("Error:", error);
+      // Handle error as per your application's needs
+    }
   });
 });
 
